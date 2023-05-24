@@ -14,5 +14,7 @@ Clean Architecture 학습하기
 계획
 
 LiveData -> Flow 로 바꾸기
+
 Jetpack Compose 적용해보기
+
 Testing

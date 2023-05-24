@@ -27,11 +27,15 @@ import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.android.dagger.R
 import com.example.android.dagger.registration.RegistrationActivity
 import com.example.android.dagger.registration.RegistrationViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class EnterDetailsFragment : Fragment() {
@@ -62,23 +66,26 @@ class EnterDetailsFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_enter_details, container, false)
 
-        enterDetailsViewModel.enterDetailsState.observe(viewLifecycleOwner,
-            Observer<EnterDetailsViewState> { state ->
-                when (state) {
-                    is EnterDetailsSuccess -> {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.CREATED) {
+                enterDetailsViewModel.enterDetailsState.collect { state ->
+                    when (state) {
+                        is EnterDetailsSuccess -> {
+                            val username = usernameEditText.text.toString()
+                            val password = passwordEditText.text.toString()
+                            registrationViewModel.updateUserData(username, password)
 
-                        val username = usernameEditText.text.toString()
-                        val password = passwordEditText.text.toString()
-                        registrationViewModel.updateUserData(username, password)
-
-                        (activity as RegistrationActivity).onDetailsEntered()
-                    }
-                    is EnterDetailsError -> {
-                        errorTextView.text = state.error
-                        errorTextView.visibility = View.VISIBLE
+                            (activity as RegistrationActivity).onDetailsEntered()
+                        }
+                        is EnterDetailsError -> {
+                            errorTextView.text = state.error
+                            errorTextView.visibility = View.VISIBLE
+                        }
+                        else -> {}
                     }
                 }
-            })
+            }
+        }
 
         setupViews(view)
         return view
@@ -102,5 +109,6 @@ class EnterDetailsFragment : Fragment() {
 }
 
 sealed class EnterDetailsViewState
+object EnterDetailsLoading: EnterDetailsViewState()
 object EnterDetailsSuccess : EnterDetailsViewState()
 data class EnterDetailsError(val error: String) : EnterDetailsViewState()

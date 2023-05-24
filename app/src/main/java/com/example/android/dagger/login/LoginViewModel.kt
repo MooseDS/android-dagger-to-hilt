@@ -19,8 +19,13 @@ package com.example.android.dagger.login
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.android.dagger.user.UserManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -30,21 +35,47 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(private val userManager: UserManager): ViewModel() {
 
-    private val _loginState = MutableLiveData<LoginViewState>()
-    val loginState: LiveData<LoginViewState>
+    private val _loginState: MutableStateFlow<LoginUiState> = MutableStateFlow(LoginUiState())
+    val loginState: StateFlow<LoginUiState>
         get() = _loginState
 
+    init {
+        viewModelScope.launch {
+            val userName = userManager.username
+            _loginState.update {
+                it.copy(
+                    loginViewState = LoginInit,
+                    userName = userName
+                )
+            }
+        }
+    }
+
     fun login(username: String, password: String) {
-        if (userManager.loginUser(username, password)) {
-            _loginState.value = LoginSuccess
-        } else {
-            _loginState.value = LoginError
+        viewModelScope.launch {
+            _loginState.update {
+                it.copy(loginViewState = LoginNothing)
+            }
+            _loginState.update {
+                if (userManager.loginUser(username, password)) {
+                    it.copy(loginViewState = LoginSuccess)
+                } else {
+                    it.copy(loginViewState = LoginError)
+                }
+            }
         }
     }
 
     fun unregister() {
-        userManager.unregister()
+        viewModelScope.launch {
+            userManager.unregister()
+        }
     }
 
     fun getUsername(): String = userManager.username
 }
+
+data class LoginUiState (
+    val loginViewState: LoginViewState = LoginNothing,
+    val userName: String = ""
+)

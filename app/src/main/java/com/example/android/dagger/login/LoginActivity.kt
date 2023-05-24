@@ -25,11 +25,15 @@ import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doOnTextChanged
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.android.dagger.R
 import com.example.android.dagger.main.MainActivity
 import com.example.android.dagger.registration.RegistrationActivity
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class LoginActivity : AppCompatActivity() {
@@ -37,30 +41,36 @@ class LoginActivity : AppCompatActivity() {
     private val loginViewModel: LoginViewModel by viewModels()
 
     private lateinit var errorTextView: TextView
+    private lateinit var usernameEditText: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        loginViewModel.loginState.observe(this, Observer<LoginViewState> { state ->
-            when (state) {
-                is LoginSuccess -> {
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.CREATED) {
+                loginViewModel.loginState.collect { state ->
+                    when(state.loginViewState) {
+                        is LoginSuccess -> {
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                            finish()
+                        }
+                        is LoginError -> errorTextView.visibility = View.VISIBLE
+                        is LoginInit -> usernameEditText.setText(state.userName)
+                        else -> {}
+                    }
                 }
-                is LoginError -> errorTextView.visibility = View.VISIBLE
             }
-        })
+        }
 
         errorTextView = findViewById(R.id.error)
+        usernameEditText = findViewById(R.id.username)
         setupViews()
     }
 
     private fun setupViews() {
-        val usernameEditText = findViewById<EditText>(R.id.username)
         usernameEditText.isEnabled = false
-        usernameEditText.setText(loginViewModel.getUsername())
 
         val passwordEditText = findViewById<EditText>(R.id.password)
         passwordEditText.doOnTextChanged { _, _, _, _ -> errorTextView.visibility = View.INVISIBLE }
@@ -82,3 +92,5 @@ class LoginActivity : AppCompatActivity() {
 sealed class LoginViewState
 object LoginSuccess : LoginViewState()
 object LoginError : LoginViewState()
+object LoginNothing: LoginViewState()
+object LoginInit: LoginViewState()
